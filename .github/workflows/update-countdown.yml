@@ -1,0 +1,129 @@
+name: Atualizar grupo Anti-Bahia
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+      timezone: 'America/Sao_Paulo'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: anti-bahia-countdown
+  cancel-in-progress: false
+
+jobs:
+  update-group:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BAILEYS_AUTH_ARCHIVE: .github/secure/baileys-auth.tar.gz.gpg
+
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Validar configuração da sessão
+        shell: bash
+        env:
+          BAILEYS_AUTH_PASSPHRASE: ${{ secrets.BAILEYS_AUTH_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${BAILEYS_AUTH_PASSPHRASE}" ]]; then
+            echo 'O secret BAILEYS_AUTH_PASSPHRASE não está configurado.' >&2
+            exit 1
+          fi
+
+          if [[ ! -f "${BAILEYS_AUTH_ARCHIVE}" ]]; then
+            echo "Arquivo de sessão cifrado não encontrado: ${BAILEYS_AUTH_ARCHIVE}" >&2
+            echo 'Execute o procedimento de bootstrap descrito no README.md.' >&2
+            exit 1
+          fi
+
+      - name: Restaurar sessão Baileys
+        shell: bash
+        env:
+          BAILEYS_AUTH_PASSPHRASE: ${{ secrets.BAILEYS_AUTH_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          passphrase_file="${RUNNER_TEMP}/baileys-passphrase"
+          archive_file="${RUNNER_TEMP}/baileys-auth.tar.gz"
+          auth_directory="${RUNNER_TEMP}/baileys-auth"
+
+          printf '%s' "${BAILEYS_AUTH_PASSPHRASE}" > "${passphrase_file}"
+          unset BAILEYS_AUTH_PASSPHRASE
+
+          mkdir -p "${auth_directory}"
+          gpg --batch --quiet --no-symkey-cache \
+            --pinentry-mode loopback \
+            --passphrase-file "${passphrase_file}" \
+            --output "${archive_file}" \
+            --decrypt "${BAILEYS_AUTH_ARCHIVE}"
+          tar --extract --gzip --file "${archive_file}" --directory "${auth_directory}"
+          rm -f -- "${archive_file}"
+
+          if [[ ! -f "${auth_directory}/creds.json" ]]; then
+            echo 'A sessão restaurada não contém creds.json.' >&2
+            exit 1
+          fi
+
+          find "${auth_directory}" -type d -exec chmod 700 {} +
+          find "${auth_directory}" -type f -exec chmod 600 {} +
+          rm -f -- "${passphrase_file}"
+
+      - name: Atualizar nome do grupo
+        env:
+          BAILEYS_AUTH_DIR: ${{ runner.temp }}/baileys-auth
+        run: npm run update-countdown
+
+      - name: Recifrar e persistir sessão atualizada
+        shell: bash
+        env:
+          BAILEYS_AUTH_PASSPHRASE: ${{ secrets.BAILEYS_AUTH_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          passphrase_file="${RUNNER_TEMP}/baileys-passphrase"
+          archive_file="${RUNNER_TEMP}/baileys-auth.tar.gz"
+          encrypted_archive="${RUNNER_TEMP}/baileys-auth.tar.gz.gpg"
+          auth_directory="${RUNNER_TEMP}/baileys-auth"
+          trap 'rm -rf -- "${auth_directory}"; rm -f -- "${archive_file}" "${encrypted_archive}" "${passphrase_file}"' EXIT
+
+          printf '%s' "${BAILEYS_AUTH_PASSPHRASE}" > "${passphrase_file}"
+          unset BAILEYS_AUTH_PASSPHRASE
+
+          tar --create --gzip \
+            --file "${archive_file}" \
+            --directory "${auth_directory}" .
+          gpg --batch --yes --quiet --no-symkey-cache \
+            --pinentry-mode loopback \
+            --passphrase-file "${passphrase_file}" \
+            --cipher-algo AES256 \
+            --output "${encrypted_archive}" \
+            --symmetric "${archive_file}"
+          cp -- "${encrypted_archive}" "${BAILEYS_AUTH_ARCHIVE}"
+
+          if git diff --quiet -- "${BAILEYS_AUTH_ARCHIVE}"; then
+            echo 'A sessão Baileys não mudou.'
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "${BAILEYS_AUTH_ARCHIVE}"
+          git commit --message 'chore: atualizar sessão Baileys cifrada'
+          git push
