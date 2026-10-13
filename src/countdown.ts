@@ -1,5 +1,5 @@
 export const COUNTDOWN_TIME_ZONE = 'America/Sao_Paulo'
-export const COUNTDOWN_GROUP_JID = '120363430033522137@g.us'//'120363414129535932@g.us'
+export const COUNTDOWN_GROUP_JID = '120363414129535932@g.us'
 
 const TARGET_DATE = {
   year: 2026,
