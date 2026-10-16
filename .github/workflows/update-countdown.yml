@@ -3,8 +3,7 @@ name: Atualizar grupo Anti-Bahia
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'
-      timezone: 'America/Sao_Paulo'
+    - cron: '0 3 * * *'
 
 permissions:
   contents: write
