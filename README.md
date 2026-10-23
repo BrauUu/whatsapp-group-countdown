@@ -43,7 +43,7 @@ O mesmo diretório de sessão é usado para listar grupos:
 BAILEYS_AUTH_DIR="/caminho/para/sessao" npm run list-groups
 ```
 
-## Atualização diária pelo GitHub Actions
+## Atualização diária pelo cron
 
 O comando abaixo calcula a quantidade de dias restantes até 19/11/2026 e atualiza o grupo `120363414129535932@g.us`:
 
@@ -51,41 +51,32 @@ O comando abaixo calcula a quantidade de dias restantes até 19/11/2026 e atuali
 npm run update-countdown
 ```
 
-O workflow [`.github/workflows/update-countdown.yml`](.github/workflows/update-countdown.yml) executa esse comando diariamente à meia-noite no fuso `America/Sao_Paulo`. Também é possível executá-lo manualmente pela aba **Actions** do repositório.
-
-### Preparar a sessão segura
-
-Na primeira vez, execute o comando manualmente em um terminal. Escaneie o QR Code pelo WhatsApp em **Configurações > Dispositivos conectados > Conectar dispositivo**. A sessão será salva em `.auth/baileys`.
-
-Depois, gere o arquivo cifrado da sessão:
+Para configurar a execução automática no servidor, torne o script executável:
 
 ```bash
-bash scripts/create-baileys-auth-archive.sh
+chmod +x scripts/update-countdown-cron.sh
 ```
 
-O script pede uma passphrase duas vezes e cria `.github/secure/baileys-auth.tar.gz.gpg`. Esse arquivo cifrado pode ser versionado; nunca versione `.auth/baileys`, arquivos `.tar.gz` sem cifragem ou a passphrase.
-
-Configure a mesma passphrase como secret do repositório, sem colocá-la em um comando ou arquivo versionado:
+Depois, abra o crontab do usuário que executará o bot:
 
 ```bash
-gh secret set BAILEYS_AUTH_PASSPHRASE
+crontab -e
 ```
 
-Alternativamente, crie esse secret em **Settings > Secrets and variables > Actions > New repository secret**.
+Adicione esta linha, substituindo `/caminho/para` pelo caminho real do projeto:
 
-Em seguida, adicione e envie o arquivo cifrado e o workflow:
-
-```bash
-git add .github/secure/baileys-auth.tar.gz.gpg .github/workflows/update-countdown.yml
-git commit -m "configurar atualização diária do grupo"
-git push
+```cron
+CRON_TZ=America/Sao_Paulo
+0 0 * * * /caminho/para/wpp-bot-gta-vi-date/scripts/update-countdown-cron.sh >> /tmp/wpp-bot-gta-vi-date.log 2>&1
 ```
 
-O workflow descriptografa a sessão apenas no runner temporário, com permissões restritas, e nunca imprime seu conteúdo. Após uma execução bem-sucedida, ele recifra eventuais alterações da sessão e atualiza somente o arquivo cifrado no repositório. Se a execução falhar, a sessão versionada não é substituída.
+O script usa a sessão persistente em `.auth/baileys`, impede execuções simultâneas e encerra após atualizar o grupo.
 
-O token do workflow precisa de permissão `contents: write` para persistir a sessão atualizada. A conta do WhatsApp precisa participar do grupo e ter permissão para alterar o nome dele. Se a sessão for invalidada, será necessário autenticar novamente localmente, gerar um novo arquivo cifrado e enviá-lo ao repositório.
+### Preparar a sessão
 
-Não compartilhe nem versione a pasta de autenticação: ela contém as credenciais do dispositivo conectado.
+Na primeira vez, execute `npm run update-countdown` manualmente no servidor e conclua a autenticação pelo QR Code em **WhatsApp > Configurações > Dispositivos conectados > Conectar dispositivo**. A sessão será salva em `.auth/baileys` e reutilizada pelo cron.
+
+Não compartilhe nem versione a pasta `.auth/baileys`: ela contém as credenciais do dispositivo conectado.
 
 ## Verificação
 
