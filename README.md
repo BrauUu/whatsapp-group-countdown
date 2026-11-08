@@ -113,8 +113,8 @@ Para `TARGET_DATE` em 19/11 às 00:00, `SHOW_MINUTES_UNTIL = 15` e fuso `America
 
 ```cron
 CRON_TZ=America/Sao_Paulo
-PROJECT=/caminho/para/wpp-bot-gta-vi-date
-LOG=/tmp/wpp-bot-gta-vi-date.log
+PROJECT=/caminho/para/whatsapp-group-countdown
+LOG=/tmp/whatsapp-group-countdown.log
 
 # 1. dias: todo dia à meia-noite
 0 0 * * *         $PROJECT/scripts/update-countdown-cron.sh >> $LOG 2>&1
@@ -158,7 +158,7 @@ Quando a véspera e o dia alvo caem em meses diferentes (por exemplo, alvo em 01
 - **Fuso horário:** `CRON_TZ` é suportado pelo cronie (Fedora, RHEL, Arch). O cron do Debian/Ubuntu ignora essa variável e usa o fuso do sistema. Nesse caso, converta os horários das linhas para o fuso do servidor ou ajuste o fuso do sistema (`timedatectl set-timezone America/Sao_Paulo`). O cálculo do título sempre usa `COUNTDOWN_TIME_ZONE`, independentemente do cron.
 - **Duração de cada execução:** cada execução abre uma conexão nova com o WhatsApp, o que leva alguns segundos. Se uma execução passar de um minuto, a seguinte é pulada pelo `flock` e aquele minuto fica sem atualização.
 - **Limite do WhatsApp:** renomear o grupo muitas vezes seguidas pode esbarrar em limites de frequência. Se isso acontecer, rode a terceira linha a cada poucos minutos (por exemplo, `45-59/5`) ou reduza `SHOW_MINUTES_UNTIL`.
-- **Logs:** acompanhe as execuções com `tail -f /tmp/wpp-bot-gta-vi-date.log`. Cada execução registra o nome atual e o novo nome do grupo.
+- **Logs:** acompanhe as execuções com `tail -f /tmp/whatsapp-group-countdown.log`. Cada execução registra o nome atual e o novo nome do grupo.
 
 Para testar a configuração antes da data, rode o script manualmente:
 
