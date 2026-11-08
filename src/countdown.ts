@@ -1,59 +1,64 @@
-export const COUNTDOWN_TIME_ZONE = 'America/Sao_Paulo'
-export const COUNTDOWN_GROUP_JID = '120363414129535932@g.us'
+import { COUNTDOWN_TIME_ZONE, GROUP_NAME, TARGET_DATE, SHOW_MINUTES_UNTIL } from './config.js'
 
-const TARGET_DATE = {
-  year: 2026,
-  month: 11,
-  day: 19,
-} as const
+const MINUTES_PER_HOUR = 60
+const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
 
-type CalendarDate = {
-  year: number
-  month: number
-  day: number
-}
+type CalendarDate = typeof TARGET_DATE
 
 const datePartsFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: COUNTDOWN_TIME_ZONE,
+  hourCycle: 'h23',
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
 })
 
-function getPart(
-  parts: Intl.DateTimeFormatPart[],
-  type: Intl.DateTimeFormatPartTypes,
-): number {
-  const value = parts.find(part => part.type === type)?.value
-
-  if (!value) {
-    throw new Error(`Não foi possível obter a parte de data: ${type}`)
-  }
-
-  return Number(value)
-}
-
 function getCalendarDate(date: Date): CalendarDate {
-  const parts = datePartsFormatter.formatToParts(date)
+  const parts = Object.fromEntries(
+    datePartsFormatter.formatToParts(date).map(part => [part.type, Number(part.value)]),
+  )
 
   return {
-    year: getPart(parts, 'year'),
-    month: getPart(parts, 'month'),
-    day: getPart(parts, 'day'),
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+    hour: parts.hour,
+    minute: parts.minute,
   }
 }
 
-function toDayNumber(date: CalendarDate): number {
-  return Date.UTC(date.year, date.month - 1, date.day) / 86_400_000
+function toMinuteNumber(date: CalendarDate): number {
+  return Date.UTC(date.year, date.month - 1, date.day, date.hour, date.minute) / 60_000
+}
+
+function formatRemaining(
+  amount: number,
+  singular: string,
+  plural: string,
+  emphasis: string,
+): string {
+  const text = amount === 1 ? `Falta apenas 1 ${singular}` : `Faltam ${amount} ${plural}`
+  return `${GROUP_NAME} (${text}${emphasis})`
 }
 
 export function getCountdownSubject(now: Date = new Date()): string {
-  const daysRemaining =
-    toDayNumber(TARGET_DATE) - toDayNumber(getCalendarDate(now))
+  const minutesRemaining = toMinuteNumber(TARGET_DATE) - toMinuteNumber(getCalendarDate(now))
 
-  if (daysRemaining <= 0) {
-    return 'Anti-Bahia (É hoje!!!)'
+  if (minutesRemaining <= 0) {
+    return `${GROUP_NAME} (Tá liberado, bora jogar!!!)`
   }
 
-  return `Anti-Bahia (Faltam ${daysRemaining} dias)`
+  if (minutesRemaining <= SHOW_MINUTES_UNTIL) {
+    return formatRemaining(minutesRemaining, 'minuto', 'minutos', '!!')
+  }
+
+  if (minutesRemaining <= MINUTES_PER_DAY) {
+    const hoursRemaining = Math.ceil(minutesRemaining / MINUTES_PER_HOUR)
+    return formatRemaining(hoursRemaining, 'hora', 'horas', '!!')
+  }
+
+  const daysRemaining = Math.ceil(minutesRemaining / MINUTES_PER_DAY)
+  return formatRemaining(daysRemaining, 'dia', 'dias', '!')
 }

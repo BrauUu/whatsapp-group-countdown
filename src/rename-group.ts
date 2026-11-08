@@ -6,10 +6,8 @@ import makeWASocket, {
 import qrcode from 'qrcode-terminal'
 import { rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import {
-  COUNTDOWN_GROUP_JID,
-  getCountdownSubject,
-} from './countdown.js'
+import { COUNTDOWN_GROUP_JID } from './config.js'
+import { getCountdownSubject } from './countdown.js'
 
 const MAX_RECONNECT_ATTEMPTS = 5
 const RECONNECT_DELAY_MS = 2_000
